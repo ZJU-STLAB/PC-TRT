@@ -1,0 +1,33 @@
+{
+    "coverage": 0.0,
+    "description": "new test suite generated",
+    "executed": false,
+    "funcName": "test",
+    "srcFile": "./test.c",
+    "testCases": [
+        {
+            "inputs": [
+                {
+                    "name": "x",
+                    "data": "1056964608",
+                    "type": "int"
+                }
+            ],
+            "outputs": {},
+            "description": "test case 0 generated",
+            "reserved": false
+        },
+        {
+            "inputs": [
+                {
+                    "name": "x",
+                    "data": "-1803036273",
+                    "type": "int"
+                }
+            ],
+            "outputs": {},
+            "description": "test case 1 generated",
+            "reserved": false
+        }
+    ]
+}

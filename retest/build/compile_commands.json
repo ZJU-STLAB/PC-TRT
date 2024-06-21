@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/sin/ReTest/build",
+  "command": "/usr/bin/clang++-13  -I/usr/lib/llvm-13/include -I/home/sin/ReTest/src -g -std=gnu++17   -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -o CMakeFiles/retest.dir/src/main.cpp.o -c /home/sin/ReTest/src/main.cpp",
+  "file": "/home/sin/ReTest/src/main.cpp",
+  "output": "CMakeFiles/retest.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/sin/ReTest/build",
+  "command": "/usr/bin/clang++-13  -I/usr/lib/llvm-13/include -I/home/sin/ReTest/src -g -std=gnu++17   -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -o CMakeFiles/generate_test.dir/test/test.cpp.o -c /home/sin/ReTest/test/test.cpp",
+  "file": "/home/sin/ReTest/test/test.cpp",
+  "output": "CMakeFiles/generate_test.dir/test/test.cpp.o"
+}
+]
