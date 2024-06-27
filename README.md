@@ -89,7 +89,7 @@ sudo make install
             - When `SIMILARITY_THRESHOLD` is set to 1, the tool only reuses the expected values of exactly matching paths, which have high credibility and generally do not require manual verification.
         - **Help**
             - In the `bin` directory, enter the command `retest --help` to get the usage instructions for the tool.
-   图
+   ![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/help.png)
 
     - **Commands**
         - Go to the `bin` directory and execute the following command to perform the PC-TRT test case reuse and generate test cases for uncovered paths:
@@ -102,14 +102,11 @@ sudo make install
     - **Input the historical version of the program**
     - **Input the test case set of the historical version in JSON format**. Refer to `test/test_suite.json` for the input format. If the input test case set is empty, the tool will generate test cases for all paths within the function under test.
 
+5. **configuration of driver function**
+![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/config.png)
 
-![image]()
-![image]()
-![image]()
-![image]()
-![image]()
-![image]()
-![image]()
+
+
 
 ## Example：
 Compile the project and run it. Run the program according to the instructions to get the results. The following figures are：
@@ -117,7 +114,10 @@ Compile the project and run it. Run the program according to the instructions to
 - the reverse.c under test
 - PC-TRT is running
 - the input test suite, the reused test cases and the generated test cases. 
-图1234
+![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/historical.png)
+![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/fig4.png)
+![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/fig5.png)
+![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/fig6.png)
 
 
 
