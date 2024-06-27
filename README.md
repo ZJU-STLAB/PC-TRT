@@ -114,7 +114,8 @@ Compile the project and run it. Run the program according to the instructions to
 - history version of reverse.c
 - the reverse.c under test
 - PC-TRT is running
-- the input test suite, the reused test cases and the generated test cases. 
+- the input test suite, the reused test cases and the generated test cases.
+
 ![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/historical.png)
 ![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/fig4.png)
 ![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/fig5.png)
