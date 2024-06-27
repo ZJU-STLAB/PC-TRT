@@ -1,0 +1,259 @@
+From 369460c97f25bdf0f5ff0220613509de5530a983 Mon Sep 17 00:00:00 2001
+From: Simonchis <supersimonchis@gmail.com>
+Date: Mon, 20 May 2024 16:25:27 +0800
+Subject: [PATCH] add klee_path_trigger and klee_path_conditional_exit internal
+  function.
+
+---
+ lib/Core/ExecutionState.cpp         |  8 ++-
+ lib/Core/ExecutionState.h           | 16 +++++
+ lib/Core/Executor.cpp               |  8 +++
+ lib/Core/SpecialFunctionHandler.cpp | 96 +++++++++++++++++++++++++++++
+ lib/Core/SpecialFunctionHandler.h   |  6 ++
+ tools/klee/main.cpp                 |  2 +
+ 6 files changed, 135 insertions(+), 1 deletion(-)
+
+diff --git a/lib/Core/ExecutionState.cpp b/lib/Core/ExecutionState.cpp
+index cb8a3ce..79b008b 100644
+--- a/lib/Core/ExecutionState.cpp
++++ b/lib/Core/ExecutionState.cpp
+@@ -48,6 +48,11 @@ namespace klee {
+ 
+ std::uint32_t ExecutionState::nextID = 1;
+ 
++bool ExecutionState::isInitialized = false;
++std::unordered_map<const llvm::BasicBlock*, uint32_t> ExecutionState::nodeID;
++std::unordered_map<const llvm::BasicBlock*, uint32_t> ExecutionState::triggerNodes;
++std::unordered_map<uint64_t, uint32_t> ExecutionState::targetEdgesID;
++
+ /***/
+ 
+ StackFrame::StackFrame(KInstIterator _caller, KFunction *_kf)
+@@ -117,7 +122,8 @@ ExecutionState::ExecutionState(const ExecutionState& state):
+     coveredNew(state.coveredNew),
+     forkDisabled(state.forkDisabled),
+     base_addrs(state.base_addrs),
+-    base_mos(state.base_mos) {
++    base_mos(state.base_mos),
++    targetEdgesCovered(state.targetEdgesCovered) {
+   for (const auto &cur_mergehandler: openMergeStack)
+     cur_mergehandler->addOpenState(this);
+ }
+diff --git a/lib/Core/ExecutionState.h b/lib/Core/ExecutionState.h
+index 0e28e04..de9701f 100644
+--- a/lib/Core/ExecutionState.h
++++ b/lib/Core/ExecutionState.h
+@@ -27,6 +27,11 @@
+ #include <memory>
+ #include <set>
+ #include <vector>
++#include <unordered_map>
++#include <unordered_set>
++#include <bitset>
++
++#include <llvm/IR/BasicBlock.h>
+ 
+ namespace klee {
+ class Array;
+@@ -255,6 +260,13 @@ public:
+   using base_mo_t = std::map<uint64_t, std::set<ref<Expr>>>;
+   base_mo_t base_mos;
+ 
++  /// @brief For path-oriented pruning.
++  static bool isInitialized; // True if the block information has been initialized.
++  static std::unordered_map<const llvm::BasicBlock*, uint32_t> nodeID; // Mapping of node IDs to their corresponding Basic Blocks.
++  static std::unordered_map<const llvm::BasicBlock*, uint32_t> triggerNodes; // target nodes for triggering 
++  static std::unordered_map<uint64_t, uint32_t> targetEdgesID; // target edges for triggering
++  std::bitset<128> targetEdgesCovered; // Coverage status of target edges.
++
+ public:
+ #ifdef KLEE_UNITTEST
+   // provide this function only in the context of unittests
+@@ -289,6 +301,10 @@ public:
+   std::uint32_t getID() const { return id; };
+   void setID() { id = nextID++; };
+   static std::uint32_t getLastID() { return nextID - 1; };
++
++  static size_t hashBlockIdPairToUInt64(uint32_t bbId1, uint32_t bbId2) {
++    return static_cast<uint64_t>(bbId1) | (static_cast<uint64_t>(bbId2) << 32);
++  }
+ };
+ 
+ struct ExecutionStateIDCompare {
+diff --git a/lib/Core/Executor.cpp b/lib/Core/Executor.cpp
+index bc27c5f..1a4dd05 100644
+--- a/lib/Core/Executor.cpp
++++ b/lib/Core/Executor.cpp
+@@ -2080,6 +2080,14 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
+   KFunction *kf = state.stack.back().kf;
+   unsigned entry = kf->basicBlockEntry[dst];
+   state.pc = &kf->instructions[entry];
++  // check if the target edges are covered
++  uint32_t srcId = ExecutionState::nodeID[src];
++  uint32_t dstId = ExecutionState::nodeID[dst];
++  size_t edgeKey = ExecutionState::hashBlockIdPairToUInt64(srcId, dstId);
++  auto it = ExecutionState::targetEdgesID.find(edgeKey);
++  if(it != ExecutionState::targetEdgesID.end()){
++    state.targetEdgesCovered.set(it->second);
++  }
+   if (state.pc->inst->getOpcode() == Instruction::PHI) {
+     PHINode *first = static_cast<PHINode*>(state.pc->inst);
+     state.incomingBBIndex = first->getBasicBlockIndex(src);
+diff --git a/lib/Core/SpecialFunctionHandler.cpp b/lib/Core/SpecialFunctionHandler.cpp
+index b0c28fb..81d849a 100644
+--- a/lib/Core/SpecialFunctionHandler.cpp
++++ b/lib/Core/SpecialFunctionHandler.cpp
+@@ -34,6 +34,7 @@ DISABLE_WARNING_DEPRECATED_DECLARATIONS
+ #include "llvm/IR/DataLayout.h"
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/IR/Module.h"
++#include "llvm/Analysis/CFG.h"
+ DISABLE_WARNING_POP
+ 
+ #include <array>
+@@ -122,6 +123,9 @@ static constexpr std::array handlerInfo = {
+   add("malloc", handleMalloc, true),
+   add("memalign", handleMemalign, true),
+   add("realloc", handleRealloc, true),
++  // path-oriented pruning
++  add("klee_path_trigger", handlePathTrigger, false),
++  add("klee_path_conditional_exit", handlePathExit, false),
+ 
+ #ifdef SUPPORT_KLEE_EH_CXX
+   add("_klee_eh_Unwind_RaiseException_impl", handleEhUnwindRaiseExceptionImpl, false),
+@@ -840,3 +844,95 @@ void SpecialFunctionHandler::handleMarkGlobal(ExecutionState &state,
+     mo->isGlobal = true;
+   }
+ }
++
++// path-oriented pruning
++void SpecialFunctionHandler::handlePathTrigger(ExecutionState &state,
++                                               KInstruction *target,
++                                               std::vector<ref<Expr> > &arguments) {
++  if(!ExecutionState::isInitialized) {
++    initializeCFGInfoInStates(state);
++  }
++}
++
++void SpecialFunctionHandler::handlePathExit(ExecutionState &state,
++                                            KInstruction *target,
++                                            std::vector<ref<Expr> > &arguments) {
++  if (!ExecutionState::isInitialized) {
++    initializeCFGInfoInStates(state);
++  }
++  // check if any target nodes are possible to reach
++  bool isReachableToTargetNodes = false;
++  const llvm::BasicBlock* currentNode = target->inst->getParent();
++  for (const auto [node, type] : ExecutionState::triggerNodes) {
++    if (llvm::isPotentiallyReachable(currentNode, node)) {
++      isReachableToTargetNodes = true;
++      break;
++    }
++  }
++  // check if any target egdes are not covered
++  if (!isReachableToTargetNodes && state.targetEdgesCovered.none()) {
++    #ifdef DEBUG_PATH_FUNCTIONS
++    errs() << "edges not covered and unable to reach target nodes\n";
++    errs() << "node " << ExecutionState::nodeID.at(currentNode) << " is terminating\n";
++    #endif
++    executor.terminateStateEarlyUser(state, "");
++  }else{
++    #ifdef DEBUG_PATH_FUNCTIONS
++    if (!state.targetEdgesCovered.none()) {
++      errs() << "edges covered\n";
++    }
++    if (!isReachableToTargetNodes) {
++      errs() << "posible to reach target nodes\n";
++    }
++    errs() << "node " << ExecutionState::nodeID[currentNode] << " will not be terminated\n";
++    #endif
++  }
++}
++
++void SpecialFunctionHandler::initializeCFGInfoInStates(ExecutionState &state){
++  assert(!ExecutionState::isInitialized && "CFG info already initialized");
++  auto function = state.stack.back().kf->function;
++  uint32_t bbId = 0;
++  for(auto &bb : *function) {
++    ExecutionState::nodeID[&bb] = bbId++;
++    // check if the basicblock is a target node
++    for(auto &inst : bb) {
++      if(auto callInst = dyn_cast<CallInst>(&inst)) {
++        if(auto calledFunction = callInst->getCalledFunction()) {
++          if(calledFunction->getName() == "klee_path_trigger") {
++            uint32_t mask = dyn_cast<ConstantInt>(callInst->getArgOperand(0))->getZExtValue();
++            #ifdef DEBUG_PATH_FUNCTIONS
++            errs() << "trigger node " << ExecutionState::nodeID[&bb] << " with mask " << mask << "\n";
++            #endif
++            ExecutionState::triggerNodes[&bb] = mask;
++          }
++        }
++      }
++    }
++  }
++
++  // add the edges from start trigger node to end trigger node and number the edges
++  uint32_t edgeID = 0;
++  for (const auto [triggerNode, mask] : ExecutionState::triggerNodes) {
++    // from low to high, the first bit indicates if the node is a start node
++    // the second bit indicates if the node is a end node
++    if (static_cast<bool>(mask & 1)) {
++      for (auto succ : successors(triggerNode)) {
++        auto it = ExecutionState::triggerNodes.find(succ);
++        if (it == ExecutionState::triggerNodes.end()) {
++          continue;
++        }
++        if (static_cast<bool>((it->second > 1) & 1)) {
++          uint32_t a = ExecutionState::nodeID[triggerNode];
++          uint32_t b = ExecutionState::nodeID[succ];
++          uint64_t key = ExecutionState::hashBlockIdPairToUInt64(a, b);
++          ExecutionState::targetEdgesID[key] = edgeID++;
++          #ifdef DEBUG_PATH_FUNCTIONS
++          errs() << "add edge " << a << " -> " << b << " with id " << edgeID << "\n";
++          #endif
++        }
++      }
++    }
++  }
++  ExecutionState::isInitialized = true;
++}
+diff --git a/lib/Core/SpecialFunctionHandler.h b/lib/Core/SpecialFunctionHandler.h
+index 3fdbf8f..55b6092 100644
+--- a/lib/Core/SpecialFunctionHandler.h
++++ b/lib/Core/SpecialFunctionHandler.h
+@@ -71,6 +71,9 @@ namespace klee {
+     /* Convenience routines */
+ 
+     std::string readStringAtAddress(ExecutionState &state, ref<Expr> address);
++
++    /* Helper function for initialization*/
++    void initializeCFGInfoInStates(ExecutionState &state);
+     
+     /* Handlers */
+ 
+@@ -119,6 +122,9 @@ namespace klee {
+     HANDLER(handleUnderConstrained);
+     HANDLER(handleWarning);
+     HANDLER(handleWarningOnce);
++    // path-oriented pruning
++    HANDLER(handlePathTrigger);
++    HANDLER(handlePathExit);
+ #undef HANDLER
+   };
+ } // End klee namespace
+diff --git a/tools/klee/main.cpp b/tools/klee/main.cpp
+index 18e67fe..938f192 100644
+--- a/tools/klee/main.cpp
++++ b/tools/klee/main.cpp
+@@ -783,6 +783,8 @@ static const char *modelledExternals[] = {
+   "klee_warning",
+   "klee_warning_once",
+   "klee_stack_trace",
++  "klee_path_conditional_exit",
++  "klee_path_trigger",
+ #ifdef SUPPORT_KLEE_EH_CXX
+   "_klee_eh_Unwind_RaiseException_impl",
+   "klee_eh_typeid_for",
+-- 
+2.25.1
+
