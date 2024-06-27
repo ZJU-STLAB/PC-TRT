@@ -103,6 +103,7 @@ sudo make install
     - **Input the test case set of the historical version in JSON format**. Refer to `test/test_suite.json` for the input format. If the input test case set is empty, the tool will generate test cases for all paths within the function under test.
 
 5. **configuration of driver function**
+   Due to the limitations of KLEE and other factors, the types supported by the current driver function generation only include int and char. If the driver function fails to be generated, you need to configure the three-step driver function according to the instructions in the following figure.
 ![image](https://github.com/ZJU-STLAB/PC-TRT-a-test-case-reuse-and-generate-tool/blob/main/figs/config.png)
 
 
