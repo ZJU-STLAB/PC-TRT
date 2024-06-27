@@ -103,6 +103,14 @@ sudo make install
     - **Input the test case set of the historical version in JSON format**. Refer to `test/test_suite.json` for the input format. If the input test case set is empty, the tool will generate test cases for all paths within the function under test.
 
 
+![image]()
+![image]()
+![image]()
+![image]()
+![image]()
+![image]()
+![image]()
+
 ## Example：
 Compile the project and run it. Run the program according to the instructions to get the results. The following figures are：
 - history version of reverse.c
