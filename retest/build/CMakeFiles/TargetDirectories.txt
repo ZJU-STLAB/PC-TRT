@@ -1,7 +1,0 @@
-/home/sin/ReTest/build/CMakeFiles/intrinsics_gen.dir
-/home/sin/ReTest/build/CMakeFiles/omp_gen.dir
-/home/sin/ReTest/build/CMakeFiles/acc_gen.dir
-/home/sin/ReTest/build/CMakeFiles/retest.dir
-/home/sin/ReTest/build/CMakeFiles/generate_test.dir
-/home/sin/ReTest/build/CMakeFiles/edit_cache.dir
-/home/sin/ReTest/build/CMakeFiles/rebuild_cache.dir
